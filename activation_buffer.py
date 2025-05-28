@@ -10,10 +10,11 @@ import matplotlib.pyplot as plt
 # Given a text_dataloader, this class extracts MLP activations from a specified layer of the model.
 # Internally, activations are stored in a buffer and yielded in batches.
 # The batches yield a random subset of the activations. When the buffer is half full, it is replenished with new activations.
+# The dataloader keeps looping
 class ActivationDataLoader:
     def __init__(self, model, tokenizer, layer_idx=1, device=None, max_length=None, batch_size=32, 
                  activation_type='input', shuffle=True, text_dataloader=None,
-                 max_buffer_size=100000):
+                 max_buffer_size=100000, show_pbars=False):
         """
         Initialize the data loader for extracting MLP activations from a transformer model.
         
@@ -37,6 +38,7 @@ class ActivationDataLoader:
         self.shuffle = shuffle
         self.text_dataloader = text_dataloader
         self.text_iterator = iter(text_dataloader)
+        self.show_pbars = show_pbars
 
         if type(model) == transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXForCausalLM:
             self.activation_dim = model.gpt_neox.layers[layer_idx].mlp.dense_h_to_4h.in_features
@@ -78,10 +80,14 @@ class ActivationDataLoader:
         else:
             raise NotImplementedError("Only GPT-NeoX models are supported in this function.")
         
-        # Forward pass with no gradient computation
-        with torch.no_grad():
-            self.model(**inputs)
-        
+        try:
+            # Forward pass with no gradient computation
+            with torch.no_grad():
+                self.model(**inputs)
+        except Exception as e:
+            print('Removing hook before raising exception:', e)
+            hook.remove()
+            raise e
         # Remove the hook
         hook.remove()
         
@@ -90,21 +96,21 @@ class ActivationDataLoader:
 
     def _get_next_text(self):
         assert(self.text_dataloader.batch_size == 1)
-        text = next(self.text_iterator, None)[0]
-        if text is None:
-            print("No more text samples available in the dataloader.")
-            print('Refreshing iterator...')
-            self.text_iterator = iter(self.text_dataloader)
-            text = next(self.text_iterator)[0]
-        while len(text) < 20:
-            text = next(self.text_iterator)[0]
-        return text
+        text = next(self.text_iterator, None)
+        while text is None or len(text[0]) < 20:
+            if text is None:
+                print("No more text samples available in the dataloader.")
+                print('Refreshing iterator...')
+                self.text_iterator = iter(self.text_dataloader)
+            text = next(self.text_iterator, None)
+        return text[0]
     
     def replenish_buffer(self):
         """Replenish the activation buffer with new activations."""
         # Collect activations from the text dataloader
 
-        print('Replenishing buffer...')
+        if self.show_pbars:
+            print('Replenishing buffer...')
         current_buffer_size = self.num_in_buffer
         self.activation_buffer[:current_buffer_size,:] = self.activation_buffer[~self.read,:]
         
@@ -112,7 +118,7 @@ class ActivationDataLoader:
         new_buffer_len = 0
 
         remaining = self.max_buffer_size - current_buffer_size
-        with tqdm(total=remaining, desc="Replenishing activations") as pbar:
+        with tqdm(total=remaining, desc="Replenishing activations", disable=not self.show_pbars) as pbar:
             while new_buffer_len + current_buffer_size < self.max_buffer_size:
                 text = self._get_next_text()
                 activations = self.extract_activations([text])
@@ -126,7 +132,8 @@ class ActivationDataLoader:
         # set all read to False
         self.read[:] = False
         self.num_in_buffer = self.max_buffer_size
-        print('Activation buffer replenished. Current size:', self.num_in_buffer)
+        if self.show_pbars:
+            print('Activation buffer replenished. Current size:', self.num_in_buffer)
         
 
     def __iter__(self):
