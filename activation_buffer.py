@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 class ActivationDataLoader:
     def __init__(self, model, tokenizer, layer_idx=1, device=None, max_length=None, batch_size=32, 
                  activation_type='input', shuffle=True, text_dataloader=None,
-                 max_buffer_size=100000, show_pbars=False):
+                 max_buffer_size=100000, show_pbars=False, dtype=torch.float16):
         """
         Initialize the data loader for extracting MLP activations from a transformer model.
         
@@ -39,6 +39,7 @@ class ActivationDataLoader:
         self.text_dataloader = text_dataloader
         self.text_iterator = iter(text_dataloader)
         self.show_pbars = show_pbars
+        self.dtype = dtype
 
         if type(model) == transformers.models.gpt_neox.modeling_gpt_neox.GPTNeoXForCausalLM:
             self.activation_dim = model.gpt_neox.layers[layer_idx].mlp.dense_h_to_4h.in_features
@@ -46,7 +47,7 @@ class ActivationDataLoader:
             raise NotImplementedError("Only GPT-NeoX models are supported in this function.")
 
         self.max_buffer_size = max_buffer_size
-        self.activation_buffer = torch.zeros((max_buffer_size, self.activation_dim), device=self.device)
+        self.activation_buffer = torch.zeros((max_buffer_size, self.activation_dim), device=self.device, dtype=dtype)
         self.read = torch.ones(max_buffer_size, dtype=torch.bool, device=self.device)
         self.num_in_buffer = 0
     
@@ -64,13 +65,13 @@ class ActivationDataLoader:
         def hook_fn(module, input, output):
             if self.activation_type == 'input':
                 # Store the input activations
-                activations.append(input[0].view(-1, self.activation_dim))
+                activations.append(input[0].view(-1, self.activation_dim).to(self.dtype))
             elif self.activation_type == 'output':
                 # Store the output activations
-                activations.append(output.view(-1, self.activation_dim))
+                activations.append(output.view(-1, self.activation_dim).to(self.dtype))
             elif self.activation_type == 'both':
                 # Store both input and output activations
-                activations.append((input[0].view(-1, self.activation_dim), output.view(-1, self.activation_dim)))
+                activations.append((input[0].view(-1, self.activation_dim).to(self.dtype), output.view(-1, self.activation_dim).to(self.dtype)))
             else:
                 raise ValueError("activation_type must be 'input', 'output', or 'both'.")
         
