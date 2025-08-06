@@ -1,3 +1,0 @@
-[submodule "sae_demo"]
-	path = sae_demo
-	url = git@github.com:adamkarvonen/dictionary_learning_demo.git
