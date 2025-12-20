@@ -2,7 +2,7 @@
 
 The pipeline to reproduce the results is in 3 ipython notebooks, which should be run in order.
 
-In all notebooks, there is a `curr_dir` variable and a `scratch_dir` variable defined at the beginning that should be changed to the location of the code and the location of the saved datasets, respectively.
+In all notebooks, there is a `curr_dir` variable and a `scratch_dir` variable defined at the beginning that should be changed to the location of the code and the location where you want to save the datasets, respectively.
 
  (The results in this paper are already precomputed and cached in this repository, so you can skip to Step 3 if you don't want to run new results.)
 
