@@ -4,3 +4,5 @@ sae_demo/
 *.sh
 key_query_investigations/
 massive_distillation/
+__pycache__/
+*.pyc

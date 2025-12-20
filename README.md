@@ -1,6 +1,6 @@
 # Code for the paper "Secret mixtures of experts inside your LLM"
 
-The pipeline to reproduce the results is in 3 ipython notebooks.
+The pipeline to reproduce the results is in 3 ipython notebooks, which should be run in order.
 
 In all notebooks, there is a `curr_dir` variable and a `scratch_dir` variable defined at the beginning that should be changed to the location of the code and the location of the saved datasets, respectively.
 
